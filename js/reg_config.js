@@ -5,7 +5,7 @@
 "use strict";
 
 var REG_CONFIG = Object.freeze({
-  GAS_URL: "https://script.google.com/macros/s/AKfycby_uXWtm4lgpxJTgvQr6En5MiGaBOkVtLZAniqxF5vE0sMR8sSUavex-hQK-KzGicWn/exec",
+  GAS_URL: "https://script.google.com/macros/s/AKfycbyJUk22-Zio4RzyWCWug5LJX0RJ3rWpt4Ud3yhHVTDED-OoYqcpy3zxMgqVD9WqCNB6/exec",
   HUB_URL: "https://ai-chat-hub-w4ozxil5aq-du.a.run.app",
   AUDIO_BASE: "./mp3/",
   NARRATION: Object.freeze({
