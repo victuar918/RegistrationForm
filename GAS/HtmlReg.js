@@ -1,18 +1,6 @@
 /**
  * HtmlReg.js – HTML Registration 접수 처리 (독립 실행형 GAS)
- * 2026-06-13
- *
- * ══════════════════════════════════════════════════════════════
- * 배포 방법
- * ══════════════════════════════════════════════════════════════
- * 1. script.google.com → 새 프로젝트 생성 (이름: AsterionHtmlReg)
- * 2. 기본 Code.gs 내용 전부 삭제
- * 3. 이 파일 내용 전체 붙여넣기
- * 4. Ctrl+S 저장
- * 5. 배포 → 새 배포 → 웹앱
- *      다음으로 실행 : 나 (Me)
- *      액세스 권한  : 모든 사용자
- * 6. 배포 URL → reg_config.js 의 GAS_URL 에 붙여넣기
+ * 2026-06-13 (2026-06-20: StructureCode 신형 알파 접미사 형식으로 변경)
  *
  * ══════════════════════════════════════════════════════════════
  * 보안 구조
@@ -80,29 +68,61 @@ function _pvRegSheet_() {
     .getSheetByName(REG_SHEETS.PV_REG);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// StructureCode 채번 (신형 알파 접미사 형식)
+//   형식 : {prefix}{5자리 순번}{2자리 알파}-{YYMMDD}   예) L-00001AA-260620
+//   순서 : 00001AA → 99999AA → 00001AB → ... → 99999ZZ → 00001BA → ...
+//   최대 : 99,999 × 676 = 약 6,759만 개
+//   ※ SignReg GAS 와 동일 알고리즘 → 폼/HTML 경로가 같은 시퀀스 공유
+//   ※ 구형 무접미사 코드(L-00001-...)는 _parseCodeMiddle 에서 자동 제외
+// ══════════════════════════════════════════════════════════════════════════════
+function _alphaToIdx(a) {
+  return (a.charCodeAt(0) - 65) * 26 + (a.charCodeAt(1) - 65);
+}
+function _idxToAlpha(i) {
+  return String.fromCharCode(65 + Math.floor(i / 26)) +
+         String.fromCharCode(65 + (i % 26));
+}
+function _parseCodeMiddle(code, prefix) {
+  if (!code.startsWith(prefix)) return null;
+  var rest  = code.slice(prefix.length);
+  var num   = parseInt(rest.slice(0, 5), 10);
+  var alpha = rest.slice(5, 7);
+  if (isNaN(num) || !/^[A-Z]{2}$/.test(alpha)) return null;
+  return { num: num, alpha: alpha };
+}
+function _generateNextCode(prefix, existingCodes) {
+  var maxSeq = 0;
+  existingCodes.forEach(function(c) {
+    var p = _parseCodeMiddle(c, prefix);
+    if (!p) return;
+    var seq = _alphaToIdx(p.alpha) * 99999 + p.num;
+    if (seq > maxSeq) maxSeq = seq;
+  });
+  var nextSeq  = maxSeq + 1;
+  var alphaIdx = Math.floor((nextSeq - 1) / 99999);
+  var num      = ((nextSeq - 1) % 99999) + 1;
+  var dateStr  = Utilities.formatDate(new Date(), "Asia/Seoul", "yyMMdd");
+  return prefix + String(num).padStart(5, "0") + _idxToAlpha(alphaIdx) + "-" + dateStr;
+}
+
 /**
- * StructureCode 생성기
- * 형식: {prefix}{5자리 일련번호}-{YYMMDD}  예) L-00001-260613
- * Archive 시트에서 동일 prefix 의 최대 번호 추출 후 +1
+ * StructureCode 생성기 — Archive 의 동일 prefix 알파 코드 집계 후 다음 코드 산출
  */
 function _generateCode(prefix) {
-  var archSh  = _getArchiveSheet();
-  var lastRow = archSh.getLastRow();
-  var maxNum  = 0;
-  var pfxKey  = prefix.replace(/-/g, "").toUpperCase();
-  if (lastRow >= 2) {
-    var codes = archSh.getRange(2, 1, lastRow - 1, 1).getValues();
-    codes.forEach(function(row) {
-      var code = String(row[0] || "").trim();
-      var m    = code.match(/^([A-Za-z]+)-(\d{5})-/);
-      if (m && m[1].toUpperCase() === pfxKey) {
-        var n = parseInt(m[2], 10);
-        if (n > maxNum) maxNum = n;
-      }
-    });
-  }
-  var dateStr = Utilities.formatDate(new Date(), "Asia/Seoul", "yyMMdd");
-  return prefix + String(maxNum + 1).padStart(5, "0") + "-" + dateStr;
+  var existing = [];
+  try {
+    var archSh  = _getArchiveSheet();
+    var lastRow = archSh.getLastRow();
+    if (lastRow >= 2) {
+      var codes = archSh.getRange(2, 1, lastRow - 1, 1).getValues();
+      codes.forEach(function(row) {
+        var c = String(row[0] || "").trim();
+        if (c) existing.push(c);
+      });
+    }
+  } catch(e) { Logger.log("_generateCode Archive 확인 실패: " + e.message); }
+  return _generateNextCode(prefix, existing);
 }
 
 /** PvReg 에서 orderNo 로 행 탐색 */
