@@ -8,7 +8,7 @@ var RegApi = (function () {
     var body = Object.assign({ action: action }, payload || {});
     return fetch(REG_CONFIG.GAS_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(body),
     }).then(function (r) { return r.json(); })
       .catch(function (e) { console.error("[RegApi GAS]", action, e); return { success: false, error: "NETWORK_ERROR" }; });
