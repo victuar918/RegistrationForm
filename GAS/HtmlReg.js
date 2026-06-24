@@ -324,6 +324,51 @@ function checkOrderStatus(payload) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// saveAddInfo
+// 완료 고객의 추가 정보/요청을 Archive 행 AddInfo 컬럼에 누적 기록 (시트 기록 전용)
+// ══════════════════════════════════════════════════════════════════════════════
+function saveAddInfo(payload) {
+  var structureCode = String(payload.structureCode || "").trim();
+  var addInfo       = String(payload.addInfo       || "").trim();
+  var addInfoType   = String(payload.addInfoType   || "REQUEST").trim();
+  if (!structureCode) return { success: false, error: "STRUCTURE_CODE_REQUIRED" };
+  if (!addInfo)       return { success: false, error: "ADD_INFO_REQUIRED" };
+  try {
+    var archSh  = _getArchiveSheet();
+    var archHdr = archSh.getRange(1, 1, 1, archSh.getLastColumn()).getValues()[0].map(String);
+    var scCI    = archHdr.indexOf("StructureCode");
+    if (scCI < 0) return { success: false, error: "ARCHIVE_NO_STRUCTURECODE_COL" };
+
+    var aiCI = archHdr.indexOf("AddInfo");
+    if (aiCI < 0) {
+      aiCI = archHdr.length;
+      archSh.getRange(1, aiCI + 1).setValue("AddInfo");
+    }
+
+    var lastRow   = archSh.getLastRow();
+    var targetRow = -1;
+    if (lastRow >= 2) {
+      var scVals = archSh.getRange(2, scCI + 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < scVals.length; i++) {
+        if (String(scVals[i][0] || "").trim() === structureCode) { targetRow = i + 2; break; }
+      }
+    }
+    if (targetRow < 0) return { success: false, error: "NOT_FOUND" };
+
+    var stamp = Utilities.formatDate(new Date(), "Asia/Seoul", "yyyy-MM-dd HH:mm:ss");
+    var entry = "[" + stamp + "][" + addInfoType + "] " + addInfo;
+    var cell  = archSh.getRange(targetRow, aiCI + 1);
+    var prev  = String(cell.getValue() || "").trim();
+    cell.setValue(prev ? (prev + "\n" + entry) : entry);
+
+    Logger.log("[saveAddInfo] " + structureCode + " <- " + addInfoType);
+    return { success: true };
+  } catch(e) {
+    return { success: false, error: "saveAddInfo 실패: " + e.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // doPost – HTML Registration 전용 Web App 엔트리포인트
 // ══════════════════════════════════════════════════════════════════════════════
 function doPost(e) {
@@ -345,6 +390,7 @@ function doPost(e) {
       case "saveDraftData"    : return jsonResponse(saveDraftData(payload));
       case "saveRegistration" : return jsonResponse(saveRegistration(payload));
       case "checkOrderStatus" : return jsonResponse(checkOrderStatus(payload));
+      case "saveAddInfo"      : return jsonResponse(saveAddInfo(payload));
       default:
         return jsonResponse({ success: false, error: "알 수 없는 action: " + payload.action });
     }
